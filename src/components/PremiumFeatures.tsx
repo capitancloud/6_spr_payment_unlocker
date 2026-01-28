@@ -6,6 +6,7 @@
  */
 
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { 
   Lock, Unlock, Crown, Download, Award, 
   Code2, BookOpen, MessageCircle, Sparkles
@@ -70,6 +71,7 @@ const features: Feature[] = [
 
 export function PremiumFeatures() {
   const { state } = usePayment();
+  const navigate = useNavigate();
   const isPremium = state.plan === 'premium';
 
   return (
@@ -222,7 +224,7 @@ export function PremiumFeatures() {
               <Button 
                 size="lg"
                 className="bg-gradient-premium text-foreground hover:opacity-90"
-                onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+                onClick={() => navigate('/pricing')}
               >
                 <Crown className="w-5 h-5 mr-2" />
                 Vai ai Piani
