@@ -15,7 +15,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Crown, Star, Loader2, CreditCard, ArrowRight } from 'lucide-react';
+import { Check, Crown, Star, Loader2, CreditCard, ArrowRight, XCircle, Zap, Database, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -68,6 +68,8 @@ export function PricingPlans() {
   const { state, upgradeToPremium, downgradeToFree } = usePayment();
   const [checkoutStep, setCheckoutStep] = useState(0);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [showCancellation, setShowCancellation] = useState(false);
+  const [cancellationStep, setCancellationStep] = useState(0);
 
   const handleSubscribe = async () => {
     setShowCheckout(true);
@@ -92,6 +94,32 @@ export function PricingPlans() {
     setTimeout(() => {
       setShowCheckout(false);
       setCheckoutStep(0);
+    }, 2000);
+  };
+
+  const handleCancellation = async () => {
+    setShowCancellation(true);
+    setCancellationStep(1);
+    
+    // Simula i passi della cancellazione
+    const steps = [
+      { step: 1, delay: 1500 }, // Richiesta cancellazione
+      { step: 2, delay: 1500 }, // Stripe processa
+      { step: 3, delay: 1500 }, // Webhook customer.subscription.deleted
+      { step: 4, delay: 1500 }, // Database aggiornato
+    ];
+    
+    for (const { step, delay } of steps) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+      setCancellationStep(step);
+    }
+    
+    downgradeToFree();
+    setCancellationStep(5);
+    
+    setTimeout(() => {
+      setShowCancellation(false);
+      setCancellationStep(0);
     }, 2000);
   };
 
@@ -193,10 +221,21 @@ export function PricingPlans() {
                     state.plan === 'premium' ? (
                       <Button 
                         variant="outline" 
-                        className="w-full"
-                        onClick={downgradeToFree}
+                        className="w-full border-destructive/50 text-destructive hover:bg-destructive/10"
+                        onClick={handleCancellation}
+                        disabled={showCancellation}
                       >
-                        Torna a Gratuito (Simula Cancellazione)
+                        {showCancellation ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Cancellazione...
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="w-4 h-4 mr-2" />
+                            Cancella Abbonamento
+                          </>
+                        )}
                       </Button>
                     ) : (
                       <Button 
@@ -218,13 +257,35 @@ export function PricingPlans() {
                       </Button>
                     )
                   ) : (
-                    <Button 
-                      variant="outline" 
-                      className="w-full"
-                      disabled={state.plan === 'free'}
-                    >
-                      {state.plan === 'free' ? 'Piano Attuale' : 'Downgrade'}
-                    </Button>
+                    state.plan === 'premium' ? (
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={handleCancellation}
+                        disabled={showCancellation}
+                      >
+                        {showCancellation ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Downgrade...
+                          </>
+                        ) : (
+                          <>
+                            <ArrowRight className="w-4 h-4 mr-2" />
+                            Passa a Gratuito
+                          </>
+                        )}
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        disabled
+                      >
+                        <Check className="w-4 h-4 mr-2" />
+                        Piano Attuale
+                      </Button>
+                    )
                   )}
                 </CardContent>
               </Card>
@@ -297,6 +358,108 @@ export function PricingPlans() {
                         </motion.div>
                       ))}
                     </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Cancellation Simulation Modal */}
+        <AnimatePresence>
+          {showCancellation && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+              >
+                <Card className="w-full max-w-md">
+                  <CardHeader>
+                    <CardTitle className="text-center">
+                      🔄 Simulazione Cancellazione
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground text-center">
+                      Ecco cosa succede quando un utente cancella l'abbonamento
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {[
+                        { step: 1, label: 'Richiesta cancellazione a Stripe...', icon: XCircle, desc: 'Il frontend chiama il backend' },
+                        { step: 2, label: 'Stripe elabora la cancellazione...', icon: CreditCard, desc: 'subscription.cancel()' },
+                        { step: 3, label: 'Webhook: subscription.deleted', icon: Zap, desc: 'Stripe notifica il server' },
+                        { step: 4, label: 'Database aggiornato', icon: Database, desc: "plan = 'free'" },
+                        { step: 5, label: 'Abbonamento cancellato! 👋', icon: AlertTriangle, desc: 'Accesso premium revocato' },
+                      ].map((item) => (
+                        <motion.div
+                          key={item.step}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ 
+                            opacity: cancellationStep >= item.step ? 1 : 0.3,
+                            x: 0 
+                          }}
+                          className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                            cancellationStep === item.step 
+                              ? 'bg-destructive/10' 
+                              : cancellationStep > item.step 
+                              ? 'bg-muted/50' 
+                              : ''
+                          }`}
+                        >
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            cancellationStep > item.step 
+                              ? 'bg-muted text-muted-foreground' 
+                              : cancellationStep === item.step
+                              ? 'bg-destructive text-destructive-foreground'
+                              : 'bg-muted'
+                          }`}>
+                            {cancellationStep > item.step ? (
+                              <Check className="w-4 h-4" />
+                            ) : cancellationStep === item.step && item.step !== 5 ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <item.icon className="w-4 h-4" />
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <span className={cancellationStep >= item.step ? 'font-medium block' : 'text-muted-foreground block'}>
+                              {item.label}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {item.desc}
+                            </span>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+
+                    {/* Codice esempio */}
+                    {cancellationStep >= 3 && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="mt-4"
+                      >
+                        <pre className="bg-code-bg text-code-text p-3 rounded-lg text-xs overflow-x-auto">
+                          <code>{`// Webhook: customer.subscription.deleted
+{
+  "type": "customer.subscription.deleted",
+  "data": {
+    "object": {
+      "id": "sub_xxx",
+      "status": "canceled"
+    }
+  }
+}`}</code>
+                        </pre>
+                      </motion.div>
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>
