@@ -16,14 +16,15 @@
  * 9. L'utente è ora premium!
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   User, Server, CreditCard, Database, CheckCircle, 
-  ArrowRight, Play, RotateCcw, Zap
+  ArrowRight, Play, RotateCcw, Zap, Pause, SkipForward, SkipBack
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 
 interface Step {
   id: number;
@@ -187,25 +188,95 @@ const actorLabels = {
   webhook: 'Webhook',
 };
 
+// Durata di ogni step in millisecondi
+const STEP_DURATION = 4000;
+
 export function PaymentFlowDiagram() {
   const [currentStep, setCurrentStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const playAnimation = async () => {
-    setIsPlaying(true);
-    setCurrentStep(0);
-    
-    for (let i = 0; i <= steps.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      setCurrentStep(i);
+  // Cleanup degli intervalli
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    };
+  }, []);
+
+  // Gestione dell'autoplay
+  useEffect(() => {
+    if (isPlaying && currentStep < steps.length) {
+      // Reset progress bar
+      setProgress(0);
+      
+      // Progress bar animation (aggiorna ogni 50ms)
+      progressIntervalRef.current = setInterval(() => {
+        setProgress(prev => {
+          const newProgress = prev + (100 / (STEP_DURATION / 50));
+          return newProgress >= 100 ? 100 : newProgress;
+        });
+      }, 50);
+
+      // Avanza allo step successivo dopo STEP_DURATION
+      intervalRef.current = setTimeout(() => {
+        if (currentStep < steps.length) {
+          setCurrentStep(prev => prev + 1);
+          setProgress(0);
+        }
+        if (currentStep >= steps.length - 1) {
+          setIsPlaying(false);
+        }
+      }, STEP_DURATION);
     }
-    
+
+    return () => {
+      if (intervalRef.current) clearTimeout(intervalRef.current);
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    };
+  }, [isPlaying, currentStep]);
+
+  const playAnimation = () => {
+    if (currentStep >= steps.length) {
+      setCurrentStep(0);
+    }
+    setIsPlaying(true);
+  };
+
+  const pauseAnimation = () => {
     setIsPlaying(false);
+    if (intervalRef.current) clearTimeout(intervalRef.current);
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+  };
+
+  const nextStep = () => {
+    pauseAnimation();
+    if (currentStep < steps.length) {
+      setCurrentStep(prev => prev + 1);
+      setProgress(0);
+    }
+  };
+
+  const prevStep = () => {
+    pauseAnimation();
+    if (currentStep > 0) {
+      setCurrentStep(prev => prev - 1);
+      setProgress(0);
+    }
+  };
+
+  const goToStep = (stepIndex: number) => {
+    pauseAnimation();
+    setCurrentStep(stepIndex + 1);
+    setProgress(0);
   };
 
   const reset = () => {
+    pauseAnimation();
     setCurrentStep(0);
-    setIsPlaying(false);
+    setProgress(0);
   };
 
   return (
@@ -228,23 +299,104 @@ export function PaymentFlowDiagram() {
         </motion.div>
 
         {/* Controlli */}
-        <div className="flex justify-center gap-4 mb-12">
+        <div className="flex flex-wrap justify-center gap-3 mb-8">
           <Button 
-            onClick={playAnimation} 
-            disabled={isPlaying}
-            className="gap-2"
+            variant="outline"
+            onClick={prevStep} 
+            disabled={currentStep === 0}
+            size="lg"
           >
-            <Play className="w-4 h-4" />
-            {isPlaying ? 'In esecuzione...' : 'Avvia Simulazione'}
+            <SkipBack className="w-4 h-4 mr-2" />
+            Precedente
           </Button>
-          <Button variant="outline" onClick={reset} disabled={isPlaying}>
+          
+          {isPlaying ? (
+            <Button 
+              onClick={pauseAnimation}
+              size="lg"
+              variant="secondary"
+            >
+              <Pause className="w-4 h-4 mr-2" />
+              Pausa
+            </Button>
+          ) : (
+            <Button 
+              onClick={playAnimation}
+              size="lg"
+              className="gap-2"
+            >
+              <Play className="w-4 h-4" />
+              {currentStep === 0 ? 'Avvia Simulazione' : 'Continua'}
+            </Button>
+          )}
+          
+          <Button 
+            variant="outline"
+            onClick={nextStep} 
+            disabled={currentStep >= steps.length}
+            size="lg"
+          >
+            Successivo
+            <SkipForward className="w-4 h-4 ml-2" />
+          </Button>
+          
+          <Button variant="ghost" onClick={reset} size="lg">
             <RotateCcw className="w-4 h-4 mr-2" />
             Reset
           </Button>
         </div>
 
+        {/* Progress bar globale */}
+        <div className="max-w-2xl mx-auto mb-8">
+          <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
+            <span>Step {Math.min(currentStep, steps.length)} di {steps.length}</span>
+            <span>{currentStep >= steps.length ? 'Completato!' : isPlaying ? 'In corso...' : 'In pausa'}</span>
+          </div>
+          <div className="h-2 bg-muted rounded-full overflow-hidden">
+            <motion.div 
+              className="h-full bg-primary rounded-full"
+              initial={{ width: 0 }}
+              animate={{ 
+                width: `${((currentStep - 1 + progress / 100) / steps.length) * 100}%` 
+              }}
+              transition={{ duration: 0.1 }}
+            />
+          </div>
+        </div>
+
+        {/* Step progress indicator (cliccabili) */}
+        <div className="flex justify-center gap-2 mb-8 flex-wrap">
+          {steps.map((step, index) => (
+            <button
+              key={step.id}
+              onClick={() => goToStep(index)}
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 text-sm font-medium ${
+                currentStep > index 
+                  ? 'bg-accent text-accent-foreground scale-100' 
+                  : currentStep === index + 1
+                  ? `${actorColors[step.actor]} scale-110 ring-4 ring-primary/30`
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              }`}
+              title={step.title}
+            >
+              {currentStep > index ? (
+                <CheckCircle className="w-5 h-5" />
+              ) : (
+                index + 1
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Step timer bar */}
+        {isPlaying && currentStep > 0 && currentStep <= steps.length && (
+          <div className="max-w-md mx-auto mb-8">
+            <Progress value={progress} className="h-1" />
+          </div>
+        )}
+
         {/* Legenda */}
-        <div className="flex flex-wrap justify-center gap-4 mb-8">
+        <div className="flex flex-wrap justify-center gap-4 mb-12">
           {Object.entries(actorLabels).map(([key, label]) => (
             <div key={key} className="flex items-center gap-2">
               <div className={`w-4 h-4 rounded-full ${actorColors[key as keyof typeof actorColors]}`} />
@@ -270,13 +422,14 @@ export function PaymentFlowDiagram() {
               }`}
             >
               {/* Icona Step */}
-              <div 
-                className={`relative z-10 flex-shrink-0 w-16 h-16 rounded-full flex items-center justify-center transition-all duration-500 ${
+              <button 
+                onClick={() => goToStep(index)}
+                className={`relative z-10 flex-shrink-0 w-16 h-16 rounded-full flex items-center justify-center transition-all duration-500 cursor-pointer hover:scale-105 ${
                   currentStep > index 
                     ? 'bg-accent text-accent-foreground scale-110' 
-                    : currentStep === index
+                    : currentStep === index + 1
                     ? `${actorColors[step.actor]} scale-110 animate-pulse-glow`
-                    : 'bg-muted text-muted-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
                 }`}
               >
                 {currentStep > index ? (
@@ -284,12 +437,15 @@ export function PaymentFlowDiagram() {
                 ) : (
                   <step.icon className="w-8 h-8" />
                 )}
-              </div>
+              </button>
 
               {/* Contenuto */}
-              <Card className={`flex-1 p-6 transition-all duration-500 ${
-                currentStep >= index ? 'opacity-100' : 'opacity-50'
-              } ${currentStep === index ? 'ring-2 ring-primary shadow-lg' : ''}`}>
+              <Card 
+                className={`flex-1 p-6 transition-all duration-500 cursor-pointer hover:shadow-lg ${
+                  currentStep > index ? 'opacity-100' : currentStep === index + 1 ? 'opacity-100' : 'opacity-50'
+                } ${currentStep === index + 1 ? 'ring-2 ring-primary shadow-lg' : ''}`}
+                onClick={() => goToStep(index)}
+              >
                 <div className="flex items-center gap-2 mb-2">
                   <span className={`px-2 py-1 rounded-full text-xs ${actorColors[step.actor]}`}>
                     {actorLabels[step.actor]}
@@ -302,7 +458,7 @@ export function PaymentFlowDiagram() {
                 {/* Code snippet */}
                 {step.code && (
                   <AnimatePresence>
-                    {currentStep >= index && (
+                    {currentStep >= index + 1 && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
@@ -319,6 +475,38 @@ export function PaymentFlowDiagram() {
             </motion.div>
           ))}
         </div>
+
+        {/* Messaggio finale */}
+        <AnimatePresence>
+          {currentStep >= steps.length && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="text-center mt-12"
+            >
+              <Card className="inline-block p-8 bg-accent/10 border-accent">
+                <motion.div
+                  animate={{ rotate: [0, 10, -10, 0] }}
+                  transition={{ duration: 0.5, repeat: 2 }}
+                >
+                  <CheckCircle className="w-16 h-16 text-accent mx-auto mb-4" />
+                </motion.div>
+                <h3 className="text-2xl font-bold mb-2 text-accent">
+                  🎉 Flusso Completato!
+                </h3>
+                <p className="text-muted-foreground mb-4">
+                  Hai visto tutto il percorso di un pagamento Stripe. 
+                  Clicca Reset per rivederlo!
+                </p>
+                <Button onClick={reset} variant="outline">
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Rivedi il Flusso
+                </Button>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </section>
   );
