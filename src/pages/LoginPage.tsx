@@ -138,10 +138,6 @@ export default function LoginPage() {
                 )}
               </Button>
             </form>
-
-            <p className="text-xs text-center text-muted-foreground mt-6">
-              🔒 Il codice viene verificato tramite hash SHA-256
-            </p>
           </CardContent>
         </Card>
       </motion.div>
