@@ -7,8 +7,10 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { usePayment } from "@/contexts/PaymentContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
-import { Crown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Crown, LogOut } from "lucide-react";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -16,6 +18,7 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const { state } = usePayment();
+  const { logout } = useAuth();
   const isPremium = state.plan === 'premium';
 
   return (
@@ -33,17 +36,29 @@ export function MainLayout({ children }: MainLayoutProps) {
               </span>
             </div>
             
-            {/* Status badge */}
-            {isPremium ? (
-              <Badge className="bg-gradient-premium text-foreground gap-1">
-                <Crown className="w-3 h-3" />
-                Premium
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="gap-1">
-                Piano Gratuito
-              </Badge>
-            )}
+            {/* Status badge e logout */}
+            <div className="flex items-center gap-3">
+              {isPremium ? (
+                <Badge className="bg-gradient-premium text-foreground gap-1">
+                  <Crown className="w-3 h-3" />
+                  Premium
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="gap-1">
+                  Piano Gratuito
+                </Badge>
+              )}
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={logout}
+                title="Logout"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </div>
           </header>
 
           {/* Main content */}
