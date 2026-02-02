@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
+import superProgrammatoreLogo from '@/assets/super-programmatore-logo.png';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -61,12 +62,16 @@ export default function LoginPage() {
         <Card className="border-2">
           <CardHeader className="text-center space-y-4">
             <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
               transition={{ delay: 0.2, type: 'spring' }}
-              className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center"
+              className="mx-auto"
             >
-              <Lock className="w-8 h-8 text-primary" />
+              <img 
+                src={superProgrammatoreLogo} 
+                alt="Super Programmatore Logo" 
+                className="w-48 h-auto mx-auto"
+              />
             </motion.div>
             <div>
               <CardTitle className="text-2xl bg-gradient-primary bg-clip-text text-transparent pb-1">
